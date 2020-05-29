@@ -19,19 +19,43 @@ class Observer
 /*****************************************************************************************/
 /*********************************SUBJECT ABSTRACT CLASS**********************************/
 /**Similarly, an abstract class defines the Subject interface:**/
-class Subject
+
+
+class Suscriber
 {
     public:
-        Subject(){};
-        virtual ~Subject(){}
-       /* void Attach (Observer* o)
+        virtual ~Suscriber(){};
+        virtual void Attach(Observer* o) = 0;
+        virtual void Detach(Observer* o) = 0;
+        Suscriber(){};
+};
+
+
+class Notifier
+{
+    public:
+        virtual ~Notifier(){};
+        virtual void Notify() = 0;
+        Notifier(){};
+};
+
+class StateChangeManager : public Suscriber, public Notifier
+{
+    public:
+
+        StateChangeManager(){};
+        virtual ~StateChangeManager(){}
+
+        void Attach (Observer* o)
         {
             _observers.push_front(o);
         }
+
         void Detach (Observer* o)
         {
             _observers.remove(o);
-        } */
+        }
+
         void Notify ()
         {
             list<Observer*>::iterator it;
@@ -39,28 +63,14 @@ class Subject
             {
                 (*it)->Update();
             }
+
         }
 
     private:
         list<Observer*> _observers;
 };
-class Manager
-{
-    public:
-        Manager(){};
-        virtual ~Manager(){}
-        void Attach (Observer* o)
-        {
-            _observers.push_front(o);
-        }
-        void Detach (Observer* o)
-        {
-            _observers.remove(o);
-        }
 
-    private:
-        list<Observer*> _observers;
-};
+
 /*****************************************************************************************/
 /*********************************CONCRET CLOCK TIMER************************************/
 
@@ -69,23 +79,20 @@ ClockTimer is a concrete subject for storing and maintaining the time of day. It
 its observers every second. ClockTimer provides the interface for retrieving individual time
 units such as the hour, minute, and second.
 **/
-class ClockTimer
+class Timer
 {
     public:
-        ClockTimer()
+        Timer(Notifier* n)
         {
             m_hours = 0;
             m_minutes = 0;
             m_seconds = 0;
-            m_subject = new Subject();
-            m_manager = new Manager();
+            m_notifier = n;
         }
 
-        ~ClockTimer()
+        ~Timer()
         {
-            cout << "Destroy Subject w/ Manager!" << endl;
-            delete m_subject;
-            delete m_manager;
+
         }
 
         int GetHour( void )
@@ -101,11 +108,6 @@ class ClockTimer
         int GetSecond( void )
         {
             return this->m_seconds;
-        }
-
-        Manager* getManager() 
-        {
-            return m_manager;
         }
 
         void Tick ()
@@ -130,15 +132,15 @@ class ClockTimer
                     }
                 }
             }
-            m_subject->Notify();
+            m_notifier->Notify();
         }
 
     private:
         int m_hours;
         int m_minutes;
         int m_seconds;
-        Subject* m_subject;
-        Manager* m_manager;
+        Notifier* m_notifier;
+        
 };
 
 
@@ -159,15 +161,16 @@ interface by inheriting from Observer.**/
 class DigitalClock: public Widget, public Observer
 {
     public:
-        DigitalClock(ClockTimer* s)
+        DigitalClock(Suscriber* s, Timer* t)
         {
-            m_timer = s;
-            m_timer->getManager()->Attach(this);
+            m_suscriber = s;
+            m_suscriber->Attach(this);
+            m_timer=t;
         }
 
         ~DigitalClock ()
         {
-            m_timer->getManager()->Detach(this);
+            m_suscriber->Detach(this);
         }
 
         void Update()
@@ -189,7 +192,8 @@ class DigitalClock: public Widget, public Observer
         }
 
     private:
-        ClockTimer* m_timer;
+        Suscriber* m_suscriber;
+        Timer* m_timer;
 };
 /*************************************************************************************************/
 /****************************************CONCRETE ANALOG CLOCK***********************************/
@@ -198,20 +202,21 @@ class DigitalClock: public Widget, public Observer
 class AnalogClock: public Widget, public Observer
 {
     public:
-        AnalogClock (ClockTimer* s)
+        AnalogClock (Suscriber* s, Timer* t)
         {
-            m_timer = s;
-            m_timer->getManager()->Attach(this);
+            m_suscriber = s;
+            m_suscriber->Attach(this);
+            m_timer= t;
         }
 
         ~AnalogClock ()
         {
-            m_timer->getManager()->Detach(this);
+            m_suscriber->Detach(this);
         }
 
         void Update ()
         {
-                Draw();
+            Draw();
         }
 
         void Draw ()
@@ -220,6 +225,7 @@ class AnalogClock: public Widget, public Observer
             string hours = TO_STRING(m_timer->GetHour());
             string minutes = TO_STRING(m_timer->GetMinute());
             string seconds = TO_STRING(m_timer->GetSecond());
+
             if(hours.size() == 1){hours = "0"+hours;}
             if(minutes.size() == 1){minutes = "0"+minutes;}
             if(seconds.size() == 1){seconds = "0"+seconds;}
@@ -227,7 +233,8 @@ class AnalogClock: public Widget, public Observer
             cout <<"I am Analog: "<< hours<<":"<<minutes<<":"<<seconds<<endl;
         }
     private:
-        ClockTimer* m_timer;
+        Suscriber* m_suscriber;
+        Timer* m_timer;
 };
 
 
@@ -236,9 +243,15 @@ class AnalogClock: public Widget, public Observer
 
 int main()
 {
-    ClockTimer* timer = new ClockTimer;
-    AnalogClock* ac= new AnalogClock(timer);
-    DigitalClock* dc = new DigitalClock(timer);
+    StateChangeManager* statechangemanager= new StateChangeManager();
+
+    Notifier* notifier= statechangemanager;
+
+    Suscriber* suscriber= statechangemanager;
+
+    Timer* timer = new Timer(notifier);
+    AnalogClock* ac= new AnalogClock(suscriber, timer);
+    DigitalClock* dc = new DigitalClock(suscriber, timer);
 
     timer->Tick();
     timer->Tick();
@@ -250,5 +263,6 @@ int main()
     delete ac;
     delete dc;
     delete timer;
+    delete statechangemanager;
     return 0;
 }
